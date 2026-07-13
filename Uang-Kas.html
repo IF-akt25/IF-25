@@ -1,0 +1,1669 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Google Spreadsheet Viewer — Tampilan data modern dari Google Sheets" />
+  <title>Spreadsheet Viewer</title>
+
+  <style>
+    /* ================================================================
+     * DESIGN TOKENS — Semua nilai desain terpusat di sini.
+     * Edit variabel ini untuk mengubah tampilan seluruh aplikasi.
+     * ================================================================ */
+    :root {
+      /* Warna — Light Mode */
+      --c-bg          : #F0F4F8;
+      --c-surface     : #FFFFFF;
+      --c-surface-2   : #F1F5F9;
+      --c-border      : #E2E8F0;
+      --c-text        : #0F172A;
+      --c-text-2      : #64748B;
+      --c-accent      : #2563EB;
+      --c-accent-dark : #1D4ED8;
+      --c-accent-bg   : #EFF6FF;
+      --c-success     : #10B981;
+      --c-error       : #EF4444;
+      --c-warning     : #F59E0B;
+      --c-stripe      : #F8FAFD;
+      --c-hover       : #EFF6FF;
+      --c-mark-bg     : #FEF08A;
+      --c-mark-txt    : #713F12;
+
+      /* Bayangan */
+      --sh-sm  : 0 1px 3px rgba(15,23,42,.06), 0 1px 2px rgba(15,23,42,.04);
+      --sh-md  : 0 4px 6px -1px rgba(15,23,42,.07), 0 2px 4px -1px rgba(15,23,42,.04);
+      --sh-lg  : 0 10px 25px -3px rgba(15,23,42,.09), 0 4px 10px -2px rgba(15,23,42,.05);
+      --sh-hdr : 0 2px 8px rgba(15,23,42,.15);
+
+      /* Tipografi */
+      --font-ui   : 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --font-mono : 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+
+      /* Transisi */
+      --ease : 0.2s cubic-bezier(.4,0,.2,1);
+
+      /* Radius */
+      --r-sm : 6px;
+      --r-md : 10px;
+      --r-lg : 16px;
+
+      /* Gradien header */
+      --grad-hdr : linear-gradient(135deg, #1E3A8A 0%, #2563EB 60%, #3B82F6 100%);
+    }
+
+    /* ================================================================
+     * DARK MODE TOKENS
+     * ================================================================ */
+    [data-theme="dark"] {
+      --c-bg          : #0B1120;
+      --c-surface     : #172033;
+      --c-surface-2   : #1E2D45;
+      --c-border      : #2A3F5F;
+      --c-text        : #E8F0FE;
+      --c-text-2      : #7EA2CC;
+      --c-accent      : #60A5FA;
+      --c-accent-dark : #93C5FD;
+      --c-accent-bg   : rgba(96,165,250,.12);
+      --c-success     : #34D399;
+      --c-error       : #F87171;
+      --c-warning     : #FBBF24;
+      --c-stripe      : #101929;
+      --c-hover       : rgba(96,165,250,.1);
+      --c-mark-bg     : #713F12;
+      --c-mark-txt    : #FEF08A;
+      --sh-sm  : 0 1px 3px rgba(0,0,0,.3);
+      --sh-md  : 0 4px 6px -1px rgba(0,0,0,.4);
+      --sh-lg  : 0 10px 25px -3px rgba(0,0,0,.5);
+      --sh-hdr : 0 2px 12px rgba(0,0,0,.5);
+      --grad-hdr : linear-gradient(135deg, #060D1A 0%, #0F2056 60%, #1E3A8A 100%);
+    }
+
+    /* ================================================================
+     * RESET & BASE
+     * ================================================================ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+
+    body {
+      font-family : var(--font-ui);
+      font-size   : 14px;
+      line-height : 1.6;
+      color       : var(--c-text);
+      background  : var(--c-bg);
+      min-height  : 100vh;
+      transition  : background var(--ease), color var(--ease);
+    }
+
+    /* Scrollbar global */
+    ::-webkit-scrollbar        { width: 7px; height: 7px; }
+    ::-webkit-scrollbar-track  { background: var(--c-surface-2); }
+    ::-webkit-scrollbar-thumb  { background: var(--c-border); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--c-text-2); }
+
+    /* ================================================================
+     * HEADER
+     * ================================================================ */
+    .app-header {
+      background : var(--grad-hdr);
+      color      : #fff;
+      padding    : 0 28px;
+      height     : 62px;
+      display    : flex;
+      align-items: center;
+      position   : sticky;
+      top        : 0;
+      z-index    : 200;
+      box-shadow : var(--sh-hdr);
+    }
+
+    .header-inner {
+      width      : 100%;
+      max-width  : 1480px;
+      margin     : 0 auto;
+      display    : flex;
+      align-items: center;
+      gap        : 14px;
+    }
+
+    /* Logo / ikon */
+    .header-logo {
+      font-size   : 1.35rem;
+      line-height : 1;
+      flex-shrink : 0;
+      filter      : drop-shadow(0 1px 2px rgba(0,0,0,.3));
+    }
+
+    /* Judul */
+    .header-title { flex: 1; min-width: 0; }
+    .header-title h1 {
+      font-size  : 1.05rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      white-space: nowrap;
+      overflow   : hidden;
+      text-overflow: ellipsis;
+    }
+    .header-title p {
+      font-size  : 0.72rem;
+      opacity    : 0.7;
+      margin-top : 1px;
+      white-space: nowrap;
+      overflow   : hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Aksi header */
+    .header-actions {
+      display     : flex;
+      align-items : center;
+      gap         : 8px;
+      flex-shrink : 0;
+    }
+
+    /* Badge waktu update */
+    .badge-time {
+      font-size   : 0.7rem;
+      font-family : var(--font-mono);
+      background  : rgba(255,255,255,.12);
+      border      : 1px solid rgba(255,255,255,.2);
+      border-radius: 999px;
+      padding     : 3px 10px;
+      color       : rgba(255,255,255,.85);
+      white-space : nowrap;
+    }
+
+    /* ================================================================
+     * TOMBOL — komponen reusable
+     * ================================================================ */
+    .btn {
+      display       : inline-flex;
+      align-items   : center;
+      gap           : 5px;
+      padding       : 6px 13px;
+      border-radius : var(--r-sm);
+      font-size     : 0.8rem;
+      font-weight   : 500;
+      font-family   : var(--font-ui);
+      cursor        : pointer;
+      border        : 1px solid transparent;
+      transition    : all var(--ease);
+      white-space   : nowrap;
+      line-height   : 1.2;
+      user-select   : none;
+    }
+    .btn:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 2px; }
+    .btn:active { transform: scale(0.96); }
+    .btn[disabled] { opacity: .45; cursor: not-allowed; pointer-events: none; }
+
+    /* Variasi ghost (untuk header) */
+    .btn-ghost {
+      background : rgba(255,255,255,.13);
+      color      : #fff;
+      border-color: rgba(255,255,255,.22);
+    }
+    .btn-ghost:hover { background: rgba(255,255,255,.24); }
+
+    /* Variasi primary */
+    .btn-primary { background: var(--c-accent); color: #fff; border-color: var(--c-accent); }
+    .btn-primary:hover { background: var(--c-accent-dark); border-color: var(--c-accent-dark); }
+
+    /* Variasi outline */
+    .btn-outline {
+      background : var(--c-surface);
+      color      : var(--c-text);
+      border-color: var(--c-border);
+      box-shadow : var(--sh-sm);
+    }
+    .btn-outline:hover { background: var(--c-surface-2); border-color: var(--c-accent); color: var(--c-accent); }
+
+    /* Tombol ikon bundar (theme toggle) */
+    .btn-icon {
+      width         : 34px;
+      height        : 34px;
+      padding       : 0;
+      display       : inline-flex;
+      align-items   : center;
+      justify-content: center;
+      border-radius : var(--r-sm);
+      border        : 1px solid rgba(255,255,255,.22);
+      background    : rgba(255,255,255,.13);
+      color         : #fff;
+      font-size     : 1rem;
+      cursor        : pointer;
+      transition    : all var(--ease);
+    }
+    .btn-icon:hover  { background: rgba(255,255,255,.26); }
+    .btn-icon:active { transform: scale(0.94); }
+    .btn-icon:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+
+    /* Animasi ikon refresh */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .is-spinning { animation: spin .75s linear infinite; }
+
+    /* ================================================================
+     * LAYOUT UTAMA
+     * ================================================================ */
+    .app-main {
+      max-width : 1480px;
+      margin    : 0 auto;
+      padding   : 24px 28px 32px;
+    }
+
+    /* ================================================================
+     * PANEL KONFIGURASI (tampil saat ID belum diisi)
+     * ================================================================ */
+    .config-panel {
+      background   : var(--c-surface);
+      border       : 2px dashed var(--c-border);
+      border-radius: var(--r-lg);
+      padding      : 48px 32px;
+      text-align   : center;
+      margin-bottom: 24px;
+    }
+    .config-panel.hidden { display: none; }
+
+    .config-panel .cfg-icon  { font-size: 3rem; margin-bottom: 16px; }
+    .config-panel h2         { font-size: 1.2rem; font-weight: 700; margin-bottom: 8px; color: var(--c-text); }
+    .config-panel p          { color: var(--c-text-2); max-width: 520px; margin: 0 auto 20px; font-size: .875rem; line-height: 1.7; }
+
+    /* Blok kode config */
+    .config-code {
+      background    : var(--c-surface-2);
+      border        : 1px solid var(--c-border);
+      border-radius : var(--r-md);
+      padding       : 16px 20px;
+      text-align    : left;
+      font-family   : var(--font-mono);
+      font-size     : .78rem;
+      line-height   : 1.8;
+      color         : var(--c-text);
+      max-width     : 640px;
+      margin        : 0 auto 20px;
+      overflow-x    : auto;
+    }
+    .cfg-key   { color: var(--c-accent); }
+    .cfg-str   { color: var(--c-success); }
+    .cfg-cmt   { color: var(--c-text-2); font-style: italic; }
+
+    /* ================================================================
+     * TOOLBAR (pencarian + kontrol)
+     * ================================================================ */
+    .toolbar {
+      display       : flex;
+      align-items   : center;
+      gap           : 12px;
+      margin-bottom : 14px;
+      flex-wrap     : wrap;
+    }
+
+    /* Kotak pencarian */
+    .search-wrap {
+      flex     : 1;
+      min-width: 220px;
+      position : relative;
+    }
+    .search-ico {
+      position : absolute;
+      left     : 11px;
+      top      : 50%;
+      transform: translateY(-50%);
+      color    : var(--c-text-2);
+      pointer-events: none;
+      display  : flex;
+    }
+    .search-input {
+      width          : 100%;
+      padding        : 8px 34px 8px 36px;
+      border         : 1px solid var(--c-border);
+      border-radius  : var(--r-md);
+      font-size      : .875rem;
+      font-family    : var(--font-ui);
+      background     : var(--c-surface);
+      color          : var(--c-text);
+      transition     : border-color var(--ease), box-shadow var(--ease);
+      box-shadow     : var(--sh-sm);
+    }
+    .search-input::placeholder { color: var(--c-text-2); }
+    .search-input:focus {
+      outline      : none;
+      border-color : var(--c-accent);
+      box-shadow   : 0 0 0 3px var(--c-accent-bg);
+    }
+    .search-x {
+      position        : absolute;
+      right           : 10px;
+      top             : 50%;
+      transform       : translateY(-50%);
+      background      : none;
+      border          : none;
+      color           : var(--c-text-2);
+      cursor          : pointer;
+      font-size       : .85rem;
+      display         : none;
+      line-height     : 1;
+      padding         : 2px 4px;
+      border-radius   : 4px;
+    }
+    .search-x:hover  { color: var(--c-text); background: var(--c-surface-2); }
+    .search-x.show   { display: block; }
+
+    /* Sisi kanan toolbar */
+    .toolbar-right { display: flex; align-items: center; gap: 8px; }
+
+    /* Dropdown baris per halaman */
+    .sel-wrap { position: relative; }
+    .sel-rpp {
+      appearance     : none;
+      -webkit-appearance: none;
+      background     : var(--c-surface);
+      border         : 1px solid var(--c-border);
+      border-radius  : var(--r-sm);
+      padding        : 7px 28px 7px 10px;
+      font-size      : .8rem;
+      font-family    : var(--font-ui);
+      color          : var(--c-text);
+      cursor         : pointer;
+      box-shadow     : var(--sh-sm);
+      transition     : border-color var(--ease);
+    }
+    .sel-rpp:focus   { outline: none; border-color: var(--c-accent); }
+    .sel-arrow {
+      position      : absolute;
+      right         : 8px;
+      top           : 50%;
+      transform     : translateY(-50%);
+      pointer-events: none;
+      color         : var(--c-text-2);
+      display       : flex;
+    }
+
+    /* ================================================================
+     * STATUS BAR
+     * ================================================================ */
+    .status-bar {
+      display       : flex;
+      align-items   : center;
+      gap           : 8px;
+      margin-bottom : 12px;
+      font-size     : .78rem;
+      color         : var(--c-text-2);
+      flex-wrap     : wrap;
+    }
+    .s-dot {
+      width        : 7px;
+      height       : 7px;
+      border-radius: 50%;
+      flex-shrink  : 0;
+      transition   : background var(--ease), box-shadow var(--ease);
+    }
+    .s-dot.ok      { background: var(--c-success); box-shadow: 0 0 0 2px rgba(16,185,129,.2); }
+    .s-dot.loading { background: var(--c-warning); box-shadow: 0 0 0 2px rgba(245,158,11,.2); }
+    .s-dot.error   { background: var(--c-error);   box-shadow: 0 0 0 2px rgba(239,68,68,.2); }
+
+    .s-count { font-weight: 700; color: var(--c-accent); font-size: .8rem; }
+    .s-sep   { color: var(--c-border); user-select: none; }
+
+    /* ================================================================
+     * KARTU TABEL
+     * ================================================================ */
+    .table-card {
+      background   : var(--c-surface);
+      border       : 1px solid var(--c-border);
+      border-radius: var(--r-lg);
+      box-shadow   : var(--sh-md);
+      overflow     : hidden;
+    }
+    .table-scroll {
+      overflow-x               : auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    /* ================================================================
+     * TABEL DATA
+     * ================================================================ */
+    .data-table {
+      width          : 100%;
+      border-collapse: collapse;
+      font-size      : .8125rem;
+    }
+
+    /* — HEADER — */
+    .data-table thead th {
+      background   : var(--c-surface-2);
+      color        : var(--c-text-2);
+      font-weight  : 600;
+      font-size    : .7rem;
+      text-transform: uppercase;
+      letter-spacing: .065em;
+      padding      : 10px 14px;
+      text-align   : left;
+      white-space  : nowrap;
+      border-bottom: 2px solid var(--c-border);
+      user-select  : none;
+      cursor       : pointer;
+      transition   : background var(--ease), color var(--ease);
+    }
+    .data-table thead th:hover { background: var(--c-hover); color: var(--c-accent); }
+    .data-table thead th.sort-asc,
+    .data-table thead th.sort-desc { color: var(--c-accent); background: var(--c-accent-bg); }
+
+    /* Ikon sort */
+    .sort-ico {
+      display        : inline-flex;
+      flex-direction : column;
+      gap            : 1px;
+      margin-left    : 5px;
+      vertical-align : middle;
+      opacity        : .3;
+      transition     : opacity var(--ease);
+    }
+    th:hover .sort-ico,
+    th.sort-asc  .sort-ico,
+    th.sort-desc .sort-ico { opacity: 1; }
+
+    th.sort-asc  .ico-up   { color: var(--c-accent); }
+    th.sort-asc  .ico-down { opacity: .25; }
+    th.sort-desc .ico-up   { opacity: .25; }
+    th.sort-desc .ico-down { color: var(--c-accent); }
+
+    /* Badge nomor kolom */
+    .col-badge {
+      display      : inline-block;
+      font-size    : .62rem;
+      font-family  : var(--font-mono);
+      font-weight  : 700;
+      background   : var(--c-border);
+      color        : var(--c-text-2);
+      border-radius: 3px;
+      padding      : 1px 4px;
+      margin-right : 5px;
+    }
+    th.sort-asc  .col-badge,
+    th.sort-desc .col-badge { background: var(--c-accent-bg); color: var(--c-accent); }
+
+    /* — BARIS — */
+    .data-table tbody tr {
+      border-bottom: 1px solid var(--c-border);
+      transition   : background var(--ease);
+    }
+    .data-table tbody tr:last-child { border-bottom: none; }
+    .data-table tbody tr:nth-child(even) td { background: var(--c-stripe); }
+    .data-table tbody tr:hover td { background: var(--c-hover) !important; }
+
+    .data-table tbody td {
+      padding      : 9px 14px;
+      color        : var(--c-text);
+      vertical-align: middle;
+      max-width    : 340px;
+      overflow     : hidden;
+      text-overflow: ellipsis;
+      white-space  : nowrap;
+      transition   : background var(--ease);
+    }
+
+    /* Kolom nomor baris */
+    .td-num {
+      color      : var(--c-text-2);
+      font-family: var(--font-mono);
+      font-size  : .72rem;
+      text-align : right;
+      width      : 44px;
+      padding    : 9px 10px 9px 14px;
+    }
+    thead .th-num {
+      text-align : right;
+      width      : 44px;
+      cursor     : default !important;
+    }
+    thead .th-num:hover { background: var(--c-surface-2) !important; color: var(--c-text-2) !important; }
+
+    /* Highlight pencarian */
+    mark {
+      background   : var(--c-mark-bg);
+      color        : var(--c-mark-txt);
+      border-radius: 2px;
+      padding      : 0 2px;
+      font-weight  : 600;
+    }
+
+    /* ================================================================
+     * STATE KOSONG / ERROR
+     * ================================================================ */
+    .state-cell {
+      padding   : 56px 24px;
+      text-align: center;
+    }
+    .state-ico  { font-size: 2.8rem; display: block; margin-bottom: 12px; }
+    .state-ttl  { font-size: 1rem; font-weight: 700; color: var(--c-text); margin-bottom: 5px; }
+    .state-desc { font-size: .82rem; color: var(--c-text-2); max-width: 380px; margin: 0 auto 18px; line-height: 1.6; }
+
+    /* ================================================================
+     * SKELETON LOADER
+     * ================================================================ */
+    @keyframes shimmer {
+      0%   { background-position: -600px 0; }
+      100% { background-position:  600px 0; }
+    }
+    .sk {
+      height       : 13px;
+      border-radius: 4px;
+      background   : linear-gradient(
+        90deg,
+        var(--c-border) 25%,
+        var(--c-surface-2) 50%,
+        var(--c-border) 75%
+      );
+      background-size: 1200px 100%;
+      animation    : shimmer 1.5s ease-in-out infinite;
+    }
+
+    /* ================================================================
+     * PAGINATION
+     * ================================================================ */
+    .pag-bar {
+      display       : flex;
+      align-items   : center;
+      justify-content: space-between;
+      padding       : 10px 16px;
+      border-top    : 1px solid var(--c-border);
+      background    : var(--c-surface-2);
+      gap           : 12px;
+      flex-wrap     : wrap;
+    }
+    .pag-info {
+      font-size : .78rem;
+      color     : var(--c-text-2);
+    }
+    .pag-ctrl  { display: flex; align-items: center; gap: 3px; }
+
+    .pg-btn {
+      min-width     : 32px;
+      height        : 32px;
+      padding       : 0 7px;
+      border        : 1px solid var(--c-border);
+      background    : var(--c-surface);
+      color         : var(--c-text);
+      border-radius : var(--r-sm);
+      font-size     : .78rem;
+      font-family   : var(--font-ui);
+      cursor        : pointer;
+      transition    : all var(--ease);
+      display       : inline-flex;
+      align-items   : center;
+      justify-content: center;
+      font-weight   : 500;
+    }
+    .pg-btn:hover:not(:disabled) {
+      border-color: var(--c-accent);
+      color       : var(--c-accent);
+      background  : var(--c-accent-bg);
+    }
+    .pg-btn.active {
+      background  : var(--c-accent);
+      color       : #fff;
+      border-color: var(--c-accent);
+      font-weight : 700;
+      box-shadow  : var(--sh-sm);
+    }
+    .pg-btn:disabled  { opacity: .3; cursor: not-allowed; }
+    .pg-sep { color: var(--c-text-2); padding: 0 3px; font-size: .875rem; line-height: 32px; user-select: none; }
+
+    /* ================================================================
+     * TOAST NOTIFIKASI
+     * ================================================================ */
+    .toast-wrap {
+      position      : fixed;
+      bottom        : 22px;
+      right         : 22px;
+      z-index       : 9999;
+      display       : flex;
+      flex-direction: column;
+      gap           : 7px;
+      pointer-events: none;
+    }
+    .toast {
+      background    : var(--c-surface);
+      border        : 1px solid var(--c-border);
+      border-radius : var(--r-md);
+      padding       : 11px 15px;
+      box-shadow    : var(--sh-lg);
+      display       : flex;
+      align-items   : center;
+      gap           : 9px;
+      font-size     : .83rem;
+      min-width     : 240px;
+      max-width     : 360px;
+      pointer-events: auto;
+      animation     : toastIn .28s ease;
+    }
+    @keyframes toastIn  { from { transform: translateX(80px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    @keyframes toastOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(80px); opacity: 0; } }
+    .toast.out          { animation: toastOut .28s ease forwards; }
+    .toast.t-success    { border-left: 3px solid var(--c-success); }
+    .toast.t-error      { border-left: 3px solid var(--c-error); }
+    .toast.t-info       { border-left: 3px solid var(--c-accent); }
+    .toast-ico          { font-size: 1rem; flex-shrink: 0; }
+    .toast-msg          { flex: 1; color: var(--c-text); line-height: 1.4; }
+
+    /* ================================================================
+     * FOOTER
+     * ================================================================ */
+    .app-footer {
+      max-width : 1480px;
+      margin    : 0 auto;
+      padding   : 0 28px 28px;
+      text-align: center;
+      font-size : .72rem;
+      color     : var(--c-text-2);
+    }
+    .app-footer a { color: var(--c-accent); text-decoration: none; }
+    .app-footer a:hover { text-decoration: underline; }
+
+    /* ================================================================
+     * KEYBOARD SHORTCUT HINT
+     * ================================================================ */
+    .kbd {
+      display        : inline-block;
+      font-family    : var(--font-mono);
+      font-size      : .65rem;
+      background     : var(--c-surface-2);
+      border         : 1px solid var(--c-border);
+      border-radius  : 3px;
+      padding        : 1px 5px;
+      color          : var(--c-text-2);
+      vertical-align : middle;
+    }
+
+    /* ================================================================
+     * RESPONSIF
+     * ================================================================ */
+    @media (max-width: 700px) {
+      .app-header     { padding: 0 16px; height: 56px; }
+      .app-main       { padding: 16px 14px 24px; }
+      .app-footer     { padding: 0 14px 20px; }
+      .badge-time     { display: none; }
+      .btn-ghost span { display: none; } /* sembunyikan label, tampilkan ikon saja */
+      .toolbar        { flex-direction: column; align-items: stretch; }
+      .toolbar-right  { justify-content: space-between; }
+      .pag-bar        { flex-direction: column; align-items: flex-start; gap: 8px; }
+    }
+
+    /* ================================================================
+     * REDUCED MOTION
+     * ================================================================ */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration : 0.01ms !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- ===============================================================
+       HEADER APLIKASI
+       =============================================================== -->
+  <header class="app-header" role="banner">
+    <div class="header-inner">
+
+      <span class="header-logo" aria-hidden="true">📊</span>
+
+      <div class="header-title">
+        <h1 id="app-title">Spreadsheet Viewer</h1>
+        <p  id="app-subtitle">Data dari Google Sheets</p>
+      </div>
+
+      <div class="header-actions">
+        <!-- Waktu terakhir diperbarui -->
+        <span class="badge-time" id="badge-time" aria-live="polite" title="Waktu pembaruan terakhir">—</span>
+
+        <!-- Tombol Ekspor CSV -->
+        <button class="btn btn-ghost" id="btn-export" title="Ekspor data ke CSV">
+          <!-- Ikon Download (SVG inline agar tidak perlu library ikon) -->
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          <span>Ekspor CSV</span>
+        </button>
+
+        <!-- Tombol Refresh -->
+        <button class="btn btn-ghost" id="btn-refresh" title="Muat ulang data (shortcut: R)">
+          <svg id="ico-refresh" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="23 4 23 10 17 10"/>
+            <polyline points="1 20 1 14 7 14"/>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+          </svg>
+          <span>Refresh</span>
+        </button>
+
+        <!-- Tombol Dark/Light Mode -->
+        <button class="btn-icon" id="btn-theme" aria-label="Ganti tema terang/gelap" title="Toggle dark mode">
+          <span id="ico-theme" aria-hidden="true">🌙</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+
+  <!-- ===============================================================
+       KONTEN UTAMA
+       =============================================================== -->
+  <main class="app-main" role="main">
+
+    <!-- Panel panduan konfigurasi (hanya tampil saat ID belum diisi) -->
+    <div class="config-panel hidden" id="config-panel" role="alert" aria-live="polite">
+      <div class="cfg-icon">⚙️</div>
+      <h2>Konfigurasi Spreadsheet Diperlukan</h2>
+      <p>
+        Edit bagian <strong>CONFIG</strong> di dalam tag <code>&lt;script&gt;</code> pada file ini.
+        Isi <code>SPREADSHEET_ID</code> dengan ID dari URL Google Spreadsheet Anda, lalu pastikan
+        spreadsheet sudah dipublikasikan (<em>File → Share → Publish to web</em>).
+      </p>
+      <div class="config-code">
+        <span class="cfg-cmt">// Temukan bagian ini di &lt;script&gt;</span><br>
+        <span class="cfg-key">const</span> CONFIG = {<br>
+        &nbsp;&nbsp;<span class="cfg-key">SPREADSHEET_ID</span> : <span class="cfg-str">'<strong>PASTE_ID_ANDA_DI_SINI</strong>'</span>,<br>
+        &nbsp;&nbsp;<span class="cfg-cmt">// ID ada di URL: /spreadsheets/d/<strong>INI_ID_NYA</strong>/edit</span><br>
+        &nbsp;&nbsp;<span class="cfg-key">SHEET_NAME</span>     : <span class="cfg-str">'Sheet1'</span>,  <span class="cfg-cmt">// nama tab</span><br>
+        &nbsp;&nbsp;<span class="cfg-key">DATA_MODE</span>      : <span class="cfg-str">'gviz'</span>,   <span class="cfg-cmt">// 'gviz' atau 'api'</span><br>
+        };
+      </div>
+      <p style="font-size:.78rem;">
+        Mode <code>gviz</code> tidak memerlukan API key &mdash; cukup publish spreadsheet ke web.<br>
+        Mode <code>api</code> memerlukan Google Sheets API key dari Google Cloud Console.
+      </p>
+    </div>
+
+    <!-- Toolbar: pencarian + kontrol tampilan -->
+    <div class="toolbar" role="search" aria-label="Pencarian dan filter data">
+
+      <!-- Input pencarian -->
+      <div class="search-wrap">
+        <span class="search-ico" aria-hidden="true">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+        </span>
+        <input
+          type     = "search"
+          id       = "search-input"
+          class    = "search-input"
+          placeholder = "Cari di semua kolom... (Ctrl+F)"
+          aria-label  = "Cari data"
+          autocomplete= "off"
+          spellcheck  = "false"
+        />
+        <button class="search-x" id="btn-clear-search" aria-label="Hapus pencarian">✕</button>
+      </div>
+
+      <!-- Kontrol sisi kanan toolbar -->
+      <div class="toolbar-right">
+        <!-- Dropdown: baris per halaman -->
+        <div class="sel-wrap">
+          <select class="sel-rpp" id="sel-rpp" aria-label="Jumlah baris per halaman">
+            <option value="10">10 baris</option>
+            <option value="25" selected>25 baris</option>
+            <option value="50">50 baris</option>
+            <option value="100">100 baris</option>
+            <option value="200">200 baris</option>
+          </select>
+          <span class="sel-arrow" aria-hidden="true">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Status bar: jumlah data, waktu, info -->
+    <div class="status-bar" role="status" aria-live="polite" aria-atomic="true">
+      <span class="s-dot loading" id="s-dot"></span>
+      <span id="s-text">Memuat data...</span>
+      <span class="s-sep">·</span>
+      <span id="s-count" class="s-count"></span>
+      <span id="s-hint" style="margin-left:4px;font-size:.72rem;color:var(--c-text-2)">
+        Tekan <kbd class="kbd">Ctrl+F</kbd> untuk cari, <kbd class="kbd">R</kbd> untuk refresh
+      </span>
+    </div>
+
+    <!-- Kartu Tabel Utama -->
+    <div class="table-card" role="region" aria-label="Tabel data spreadsheet">
+      <div class="table-scroll">
+        <table class="data-table" id="data-table" aria-label="Data dari Google Spreadsheet">
+          <thead id="tbl-head"></thead>
+          <tbody id="tbl-body"></tbody>
+        </table>
+      </div>
+
+      <!-- Paginasi (tersembunyi saat tidak diperlukan) -->
+      <div class="pag-bar" id="pag-bar" style="display:none">
+        <span class="pag-info" id="pag-info" aria-live="polite"></span>
+        <nav class="pag-ctrl" id="pag-ctrl" aria-label="Navigasi halaman"></nav>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="app-footer" role="contentinfo">
+    <p>
+      Spreadsheet Viewer &mdash; Data diambil dari
+      <a id="sheet-link" href="#" target="_blank" rel="noopener noreferrer">Google Spreadsheet</a>
+      &mdash; Dibuat dengan HTML + CSS + JS murni
+    </p>
+  </footer>
+
+  <!-- Kontainer Toast Notifikasi (fixed, kanan bawah) -->
+  <div class="toast-wrap" id="toast-wrap" aria-live="assertive"></div>
+
+
+  <!-- ===============================================================
+       JAVASCRIPT — Seluruh logika aplikasi
+       =============================================================== -->
+  <script>
+    /* ==============================================================
+     * ⚙️  KONFIGURASI UTAMA
+     * --------------------------------------------------------------
+     * Edit bagian ini sebelum menggunakan aplikasi.
+     *
+     * MODE DATA:
+     *  'gviz' — Gunakan Google Visualization API (GViz).
+     *           TIDAK memerlukan API key.
+     *           Syarat: File > Share > Publish to web (Seluruh dokumen, Web page).
+     *
+     *  'api'  — Gunakan Google Sheets API v4.
+     *           Memerlukan API key dari Google Cloud Console.
+     *           Aktifkan "Google Sheets API" pada proyek Anda.
+     *           Buat Credentials > API key, batasi ke Sheets API.
+     * ============================================================== */
+    const CONFIG = {
+
+      /* ── Identitas Spreadsheet ─────────────────────────────────── */
+      SPREADSHEET_ID : '1UHmVBitTNVx_dfPyiaMGngIotv8lq3piDSSNyfVcYlc',
+      // Cara menemukan ID: buka spreadsheet, salin bagian ini dari URL:
+      // https://docs.google.com/spreadsheets/d/ [ID_ADA_DI_SINI] /edit
+      // Contoh: '1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms'
+
+      SHEET_NAME     : '2026',
+      // Nama tab/lembar kerja, persis sesuai nama di Google Sheets (case-sensitive)
+
+      /* ── Mode pengambilan data ─────────────────────────────────── */
+      DATA_MODE      : 'gviz',
+      // 'gviz' → tidak perlu API key (direkomendasikan untuk awal)
+      // 'api'  → perlu API key di bawah
+
+      /* ── Hanya untuk DATA_MODE = 'api' ──────────────────────────── */
+      API_KEY        : 'YOUR_GOOGLE_SHEETS_API_KEY_HERE',
+      // Contoh: 'AIzaSyD-9tSrke72PouQMnMX-a7eZSW0jkFMBWY'
+
+      /* ── Pengaturan tampilan ────────────────────────────────────── */
+      APP_TITLE      : 'Kas Real',
+      APP_SUBTITLE   : 'Data Kas Mahasiswa 2026',
+      DATE_LOCALE    : 'id-ID',          // Locale format tanggal & angka
+      DEFAULT_RPP    : 25,               // Baris per halaman awal
+      SHOW_ROW_NUMS  : true,             // Tampilkan kolom nomor baris (#)
+      FIRST_ROW_HDR  : true,             // Baris pertama sebagai nama kolom
+    };
+
+
+    /* ==============================================================
+     * 🗃️  STATE APLIKASI
+     * Satu objek terpusat untuk semua state — mudah di-debug & di-trace
+     * ============================================================== */
+    const App = {
+      rows       : [],    // semua baris dari spreadsheet
+      filtered   : [],    // baris setelah filter & sort
+      headers    : [],    // nama-nama kolom
+      page       : 1,     // halaman aktif
+      rpp        : CONFIG.DEFAULT_RPP,   // rows per page
+      sortCol    : -1,    // indeks kolom sort (-1 = tidak ada)
+      sortDir    : 'asc', // 'asc' | 'desc'
+      query      : '',    // kata kunci pencarian
+      loading    : false, // flag loading
+      lastUpdate : null,  // Date objek saat data terakhir dimuat
+    };
+
+
+    /* ==============================================================
+     * 🌐  PENGAMBILAN DATA
+     * ============================================================== */
+
+    /**
+     * fetchData()
+     * Titik masuk utama. Memilih strategi fetch berdasarkan CONFIG.DATA_MODE.
+     * Mengelola state loading, error, dan pembaruan UI.
+     */
+    async function fetchData() {
+      if (App.loading) return;
+
+      // Validasi konfigurasi sebelum fetch
+      if (!CONFIG.SPREADSHEET_ID || CONFIG.SPREADSHEET_ID === 'YOUR_SPREADSHEET_ID_HERE') {
+        showConfigPanel();
+        return;
+      }
+
+      App.loading = true;
+      setRefreshing(true);
+      showSkeleton();
+      setStatus('loading', 'Memuat data dari Google Sheets…', '');
+
+      try {
+        const { headers, rows } = await (
+          CONFIG.DATA_MODE === 'api' ? fetchViaAPI() : fetchViaGViz()
+        );
+
+        /* Simpan ke state */
+        App.headers    = headers;
+        App.rows       = rows;
+        App.lastUpdate = new Date();
+
+        /* Reset interaksi pengguna */
+        App.query   = '';
+        App.sortCol = -1;
+        App.sortDir = 'asc';
+        App.page    = 1;
+        dom('search-input').value = '';
+        dom('btn-clear-search').classList.remove('show');
+
+        applyFilterSort();
+        renderAll();
+
+        const n = rows.length;
+        setStatus('ok', `Berhasil dimuat`, `${n.toLocaleString(CONFIG.DATE_LOCALE)} baris`);
+        updateBadgeTime();
+        toast(`${n.toLocaleString(CONFIG.DATE_LOCALE)} baris berhasil dimuat`, 't-success');
+
+      } catch (err) {
+        console.error('[SpreadsheetViewer]', err);
+        showTableError(err.message || 'Kesalahan tidak diketahui');
+        setStatus('error', 'Gagal memuat data', '');
+        toast(err.message, 't-error');
+
+      } finally {
+        App.loading = false;
+        setRefreshing(false);
+      }
+    }
+
+    /**
+     * fetchViaGViz()
+     * Mengambil data menggunakan Google Visualization Query API.
+     * Tidak memerlukan API key — spreadsheet cukup di-publish ke web.
+     */
+    async function fetchViaGViz() {
+      const sheetEnc = encodeURIComponent(CONFIG.SHEET_NAME);
+      const url = `https://docs.google.com/spreadsheets/d/${CONFIG.SPREADSHEET_ID}/gviz/tq?tqx=out:json&sheet=${sheetEnc}&headers=0`;
+
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status} dari Google Sheets.`);
+
+      const raw = await res.text();
+
+      /* GViz membungkus JSON dalam callback — strip prefix & suffix */
+      const jsonStr = raw
+        .replace(/^[^(]+\(/, '')   // hapus: /*O_o*/\ngoogle.visualization.Query.setResponse(
+        .replace(/\);?\s*$/, ''); // hapus: );
+
+      let data;
+      try {
+        data = JSON.parse(jsonStr);
+      } catch {
+        throw new Error(
+          'Format respons Google Sheets tidak valid. ' +
+          'Pastikan spreadsheet sudah dipublikasikan (File → Share → Publish to web).'
+        );
+      }
+
+      if (data.status === 'error') {
+        const msg = data.errors?.[0]?.detailed_message
+          || data.errors?.[0]?.message
+          || 'Error dari Google Sheets API';
+        throw new Error(msg);
+      }
+
+      return parseGViz(data);
+    }
+
+    /**
+     * parseGViz(data)
+     * Mengubah respons GViz menjadi { headers, rows } yang seragam.
+     */
+    function parseGViz(data) {
+      const cols    = data.table.cols;
+      const rawRows = data.table.rows || [];
+
+      /* Ekstrak header dari label kolom */
+      const headers = cols.map((c, i) => c.label?.trim() || `Kolom ${i + 1}`);
+
+      /* Ekstrak nilai baris — utamakan formatted value (f) jika ada */
+      const rows = rawRows.map(row =>
+        (row.c || []).map(cell => {
+          if (!cell || cell.v === null || cell.v === undefined) return '';
+          return cell.f !== undefined && cell.f !== null
+            ? String(cell.f)
+            : String(cell.v);
+        })
+      );
+
+      /* Hapus baris kosong total */
+      const filtered = rows.filter(r => r.some(v => v !== ''));
+
+      return { headers, rows: filtered };
+    }
+
+    /**
+     * fetchViaAPI()
+     * Mengambil data menggunakan Google Sheets API v4.
+     * Memerlukan API key yang valid.
+     */
+    async function fetchViaAPI() {
+      if (!CONFIG.API_KEY || CONFIG.API_KEY === 'YOUR_GOOGLE_SHEETS_API_KEY_HERE') {
+        throw new Error(
+          'CONFIG.API_KEY belum diisi. ' +
+          'Isi API key atau ubah DATA_MODE menjadi "gviz".'
+        );
+      }
+
+      const range  = encodeURIComponent(CONFIG.SHEET_NAME);
+      const url    = `https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.SPREADSHEET_ID}/values/${range}?key=${CONFIG.API_KEY}`;
+      const res    = await fetch(url);
+      const json   = await res.json();
+
+      if (!res.ok) {
+        throw new Error(`Google Sheets API: ${json?.error?.message || 'HTTP ' + res.status}`);
+      }
+      if (!json.values || json.values.length === 0) {
+        throw new Error('Spreadsheet kosong atau tidak ada data dalam rentang yang ditentukan.');
+      }
+
+      let headerRow, dataRows;
+
+      if (CONFIG.FIRST_ROW_HDR) {
+        headerRow = json.values[0];
+        dataRows  = json.values.slice(1);
+      } else {
+        headerRow = json.values[0].map((_, i) => `Kolom ${i + 1}`);
+        dataRows  = json.values;
+      }
+
+      /* Normalisasi panjang baris agar sama dengan jumlah kolom */
+      const maxC = headerRow.length;
+      const rows = dataRows.map(row => {
+        const r = [...row];
+        while (r.length < maxC) r.push('');
+        return r.slice(0, maxC).map(v => (v == null ? '' : String(v)));
+      }).filter(r => r.some(v => v !== ''));
+
+      return { headers: headerRow.map(String), rows };
+    }
+
+
+    /* ==============================================================
+     * 🔍  FILTER & PENGURUTAN
+     * ============================================================== */
+
+    /**
+     * applyFilterSort()
+     * Menerapkan pencarian dan sorting pada App.rows → App.filtered.
+     * Selalu reset halaman ke 1.
+     */
+    function applyFilterSort() {
+      let result = [...App.rows];
+
+      /* 1. Filter teks — cari di semua kolom */
+      if (App.query) {
+        const q = App.query.toLowerCase();
+        result = result.filter(row =>
+          row.some(cell => cell.toLowerCase().includes(q))
+        );
+      }
+
+      /* 2. Urutkan berdasarkan kolom aktif */
+      if (App.sortCol >= 0) {
+        result.sort((a, b) => {
+          const va = a[App.sortCol] ?? '';
+          const vb = b[App.sortCol] ?? '';
+
+          /* Coba bandingkan sebagai bilangan jika keduanya numerik */
+          const na = parseFloat(va.replace(/[^\d.-]/g, ''));
+          const nb = parseFloat(vb.replace(/[^\d.-]/g, ''));
+          const numeric = !isNaN(na) && !isNaN(nb) && va !== '' && vb !== '';
+
+          const cmp = numeric
+            ? na - nb
+            : va.localeCompare(vb, CONFIG.DATE_LOCALE, { numeric: true, sensitivity: 'base' });
+
+          return App.sortDir === 'asc' ? cmp : -cmp;
+        });
+      }
+
+      App.filtered = result;
+      App.page     = 1;
+    }
+
+    /**
+     * handleSort(colIdx)
+     * Toggle arah sort atau pilih kolom baru.
+     */
+    function handleSort(colIdx) {
+      if (App.sortCol === colIdx) {
+        App.sortDir = App.sortDir === 'asc' ? 'desc' : 'asc';
+      } else {
+        App.sortCol = colIdx;
+        App.sortDir = 'asc';
+      }
+      applyFilterSort();
+      renderAll();
+    }
+
+
+    /* ==============================================================
+     * 🖥️  RENDER UI
+     * ============================================================== */
+
+    /** renderAll() — render header + body + paginasi sekaligus */
+    function renderAll() {
+      renderHead();
+      renderBody();
+      renderPagination();
+    }
+
+    /**
+     * renderHead()
+     * Membuat baris <thead> dengan ikon sort dan badge nomor kolom.
+     */
+    function renderHead() {
+      const thead = dom('tbl-head');
+      if (!App.headers.length) { thead.innerHTML = ''; return; }
+
+      const tr = document.createElement('tr');
+
+      /* Kolom nomor baris */
+      if (CONFIG.SHOW_ROW_NUMS) {
+        const th = document.createElement('th');
+        th.className = 'th-num';
+        th.textContent = '#';
+        tr.appendChild(th);
+      }
+
+      App.headers.forEach((label, i) => {
+        const isAsc  = App.sortCol === i && App.sortDir === 'asc';
+        const isDesc = App.sortCol === i && App.sortDir === 'desc';
+
+        const th = document.createElement('th');
+        if (isAsc)  th.className = 'sort-asc';
+        if (isDesc) th.className = 'sort-desc';
+
+        /* Konten th: badge nomor + label + ikon sort */
+        th.innerHTML = `
+          <span class="col-badge">${i + 1}</span>${esc(label)}
+          <span class="sort-ico" aria-hidden="true">
+            <svg class="ico-up"   width="7" height="7" viewBox="0 0 8 8"><path d="M4 1L7.5 6.5H.5L4 1Z" fill="currentColor"/></svg>
+            <svg class="ico-down" width="7" height="7" viewBox="0 0 8 8"><path d="M4 7L.5 1.5H7.5L4 7Z" fill="currentColor"/></svg>
+          </span>`;
+
+        th.setAttribute('role',     'columnheader');
+        th.setAttribute('tabindex', '0');
+        th.setAttribute('title',    `Urutkan: ${label}`);
+        th.setAttribute('aria-sort', isAsc ? 'ascending' : isDesc ? 'descending' : 'none');
+
+        th.addEventListener('click',   ()  => handleSort(i));
+        th.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSort(i); }
+        });
+
+        tr.appendChild(th);
+      });
+
+      thead.innerHTML = '';
+      thead.appendChild(tr);
+    }
+
+    /**
+     * renderBody()
+     * Membuat baris <tbody> untuk slice halaman aktif.
+     * Menerapkan highlight pada teks yang cocok dengan query.
+     */
+    function renderBody() {
+      const tbody  = dom('tbl-body');
+      const colSpan = App.headers.length + (CONFIG.SHOW_ROW_NUMS ? 1 : 0);
+      tbody.innerHTML = '';
+
+      /* State kosong */
+      if (!App.filtered.length) {
+        const noData = App.rows.length === 0;
+        tbody.innerHTML = `
+          <tr><td colspan="${colSpan}" class="state-cell">
+            <span class="state-ico">${noData ? '📭' : '🔍'}</span>
+            <div class="state-ttl">${noData ? 'Tidak ada data' : 'Tidak ada hasil'}</div>
+            <div class="state-desc">
+              ${noData
+                ? 'Spreadsheet tampaknya kosong. Tambahkan data dan klik Refresh.'
+                : `Tidak ada hasil untuk "<strong>${esc(App.query)}</strong>". Coba kata kunci lain.`}
+            </div>
+            ${App.query ? `<button class="btn btn-outline" onclick="clearSearch()">Hapus Pencarian</button>` : ''}
+          </td></tr>`;
+        showPagination(false);
+        return;
+      }
+
+      /* Slice data untuk halaman aktif */
+      const start = (App.page - 1) * App.rpp;
+      const slice = App.filtered.slice(start, start + App.rpp);
+      const q     = App.query.toLowerCase();
+      const frag  = document.createDocumentFragment();
+
+      slice.forEach((row, ri) => {
+        const tr = document.createElement('tr');
+
+        /* Sel nomor baris */
+        if (CONFIG.SHOW_ROW_NUMS) {
+          const td = document.createElement('td');
+          td.className  = 'td-num';
+          td.textContent = (start + ri + 1).toLocaleString(CONFIG.DATE_LOCALE);
+          tr.appendChild(td);
+        }
+
+        /* Sel data */
+        App.headers.forEach((_, ci) => {
+          const td  = document.createElement('td');
+          const raw = row[ci] ?? '';
+          td.innerHTML = q ? hlMatch(esc(raw), q) : esc(raw);
+          td.title = raw;   // tooltip untuk teks panjang
+          tr.appendChild(td);
+        });
+
+        frag.appendChild(tr);
+      });
+
+      tbody.appendChild(frag);
+      showPagination(true);
+    }
+
+    /**
+     * renderPagination()
+     * Membuat kontrol navigasi halaman dengan ellipsis.
+     */
+    function renderPagination() {
+      const total      = App.filtered.length;
+      const totalPages = Math.ceil(total / App.rpp);
+      const cur        = App.page;
+      const start      = Math.min((cur - 1) * App.rpp + 1, total);
+      const end        = Math.min(cur * App.rpp, total);
+
+      dom('pag-info').textContent = total
+        ? `Menampilkan ${start.toLocaleString(CONFIG.DATE_LOCALE)}–${end.toLocaleString(CONFIG.DATE_LOCALE)} dari ${total.toLocaleString(CONFIG.DATE_LOCALE)} baris`
+        : 'Tidak ada data';
+
+      const ctrl = dom('pag-ctrl');
+      ctrl.innerHTML = '';
+      if (totalPages <= 1) return;
+
+      /* Helper: buat tombol halaman */
+      const mkBtn = (html, page, active = false, disabled = false) => {
+        const b = document.createElement('button');
+        b.className = 'pg-btn' + (active ? ' active' : '');
+        b.innerHTML = html;
+        b.disabled  = disabled;
+        b.setAttribute('aria-label', `Halaman ${page}`);
+        if (active) b.setAttribute('aria-current', 'page');
+        if (!disabled) b.addEventListener('click', () => goPage(page));
+        return b;
+      };
+
+      /* Panah kiri (prev) */
+      ctrl.appendChild(mkBtn('&#8592;', cur - 1, false, cur === 1));
+
+      /* Nomor halaman: selalu tampil 1, totalPages, dan ±2 dari cur */
+      const pages = new Set([1, totalPages]);
+      for (let p = Math.max(2, cur - 2); p <= Math.min(totalPages - 1, cur + 2); p++) pages.add(p);
+      const sorted = [...pages].sort((a, b) => a - b);
+
+      let prev = null;
+      sorted.forEach(p => {
+        if (prev !== null && p - prev > 1) {
+          const sep = document.createElement('span');
+          sep.className   = 'pg-sep';
+          sep.textContent = '…';
+          sep.setAttribute('aria-hidden', 'true');
+          ctrl.appendChild(sep);
+        }
+        ctrl.appendChild(mkBtn(p, p, p === cur));
+        prev = p;
+      });
+
+      /* Panah kanan (next) */
+      ctrl.appendChild(mkBtn('&#8594;', cur + 1, false, cur === totalPages));
+    }
+
+    /** goPage(n) — navigasi ke halaman n dengan scroll halus ke tabel */
+    function goPage(n) {
+      const max = Math.ceil(App.filtered.length / App.rpp);
+      App.page  = Math.max(1, Math.min(n, max));
+      renderBody();
+      renderPagination();
+      document.querySelector('.table-card').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    /** showPagination(bool) — tampilkan/sembunyikan bar paginasi */
+    function showPagination(show) {
+      dom('pag-bar').style.display = show ? 'flex' : 'none';
+    }
+
+
+    /* ==============================================================
+     * ⏳  STATE VISUAL
+     * ============================================================== */
+
+    /**
+     * showSkeleton()
+     * Tampilkan placeholder animasi shimmer saat data sedang dimuat.
+     */
+    function showSkeleton(cols = 5, rows = 9) {
+      const withNum = cols + (CONFIG.SHOW_ROW_NUMS ? 1 : 0);
+
+      /* Header skeleton */
+      const headTr = document.createElement('tr');
+      for (let i = 0; i < withNum; i++) {
+        const th = document.createElement('th');
+        th.innerHTML = `<div class="sk" style="width:${55 + Math.random() * 70}px;height:11px"></div>`;
+        headTr.appendChild(th);
+      }
+      dom('tbl-head').innerHTML = '';
+      dom('tbl-head').appendChild(headTr);
+
+      /* Body skeleton */
+      dom('tbl-body').innerHTML = '';
+      const frag = document.createDocumentFragment();
+      for (let r = 0; r < rows; r++) {
+        const tr = document.createElement('tr');
+        for (let c = 0; c < withNum; c++) {
+          const td = document.createElement('td');
+          const w  = 35 + Math.floor(Math.random() * 130);
+          td.innerHTML = `<div class="sk" style="width:${w}px;animation-delay:${(r * withNum + c) * 45}ms"></div>`;
+          tr.appendChild(td);
+        }
+        frag.appendChild(tr);
+      }
+      dom('tbl-body').appendChild(frag);
+      showPagination(false);
+    }
+
+    /**
+     * showTableError(msg)
+     * Tampilkan pesan error dalam sel tabel dengan tombol coba lagi.
+     */
+    function showTableError(msg) {
+      const colSpan = 6;
+      dom('tbl-head').innerHTML = '';
+      dom('tbl-body').innerHTML = `
+        <tr><td colspan="${colSpan}" class="state-cell">
+          <span class="state-ico">⚠️</span>
+          <div class="state-ttl">Gagal memuat data</div>
+          <div class="state-desc">${esc(msg)}</div>
+          <button class="btn btn-primary" onclick="fetchData()">Coba Lagi</button>
+        </td></tr>`;
+      showPagination(false);
+    }
+
+    /** showConfigPanel() — tampilkan panel panduan konfigurasi */
+    function showConfigPanel() {
+      dom('config-panel').classList.remove('hidden');
+      dom('tbl-head').innerHTML = '';
+      dom('tbl-body').innerHTML = '';
+      showPagination(false);
+      setStatus('error', 'Konfigurasi belum lengkap', '');
+    }
+
+
+    /* ==============================================================
+     * 📊  STATUS BAR
+     * ============================================================== */
+
+    function setStatus(type, text, count) {
+      dom('s-dot').className = `s-dot ${type}`;
+      dom('s-text').textContent = text;
+      dom('s-count').textContent = count || '';
+    }
+
+    function updateBadgeTime() {
+      if (!App.lastUpdate) return;
+      const t = App.lastUpdate.toLocaleTimeString(CONFIG.DATE_LOCALE, {
+        hour: '2-digit', minute: '2-digit', second: '2-digit',
+      });
+      dom('badge-time').textContent = `⟳ ${t}`;
+    }
+
+
+    /* ==============================================================
+     * 🎛️  KONTROL PENGGUNA
+     * ============================================================== */
+
+    /** setRefreshing(bool) — animasi ikon refresh + disable tombol */
+    function setRefreshing(on) {
+      const ico = dom('ico-refresh');
+      const btn = dom('btn-refresh');
+      ico.classList.toggle('is-spinning', on);
+      btn.disabled = on;
+      btn.setAttribute('aria-busy', String(on));
+    }
+
+    /** handleSearch(val) — filter live dengan debounce */
+    let _debTimer;
+    function handleSearch(val) {
+      clearTimeout(_debTimer);
+      _debTimer = setTimeout(() => {
+        App.query = val.trim();
+        dom('btn-clear-search').classList.toggle('show', App.query.length > 0);
+        applyFilterSort();
+        renderAll();
+        setStatus(
+          'ok',
+          App.query
+            ? `${App.filtered.length.toLocaleString(CONFIG.DATE_LOCALE)} hasil untuk "${App.query}"`
+            : `${App.rows.length.toLocaleString(CONFIG.DATE_LOCALE)} baris`,
+          ''
+        );
+      }, 250);
+    }
+
+    /** clearSearch() — hapus input pencarian dan reset filter */
+    function clearSearch() {
+      dom('search-input').value = '';
+      handleSearch('');
+      dom('search-input').focus();
+    }
+
+    /** toggleTheme() — ganti light/dark, simpan ke localStorage */
+    function toggleTheme() {
+      const root = document.documentElement;
+      const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      root.setAttribute('data-theme', next);
+      dom('ico-theme').textContent = next === 'dark' ? '☀️' : '🌙';
+      try { localStorage.setItem('sv_theme', next); } catch { /* incognito */ }
+    }
+
+    /** exportCSV() — unduh data terfilter sebagai file CSV */
+    function exportCSV() {
+      if (!App.filtered.length) {
+        toast('Tidak ada data untuk diekspor', 't-info');
+        return;
+      }
+      const q     = v => `"${String(v).replace(/"/g, '""')}"`;
+      const lines = [
+        App.headers.map(q).join(','),
+        ...App.filtered.map(row => row.map(q).join(',')),
+      ];
+      const blob = new Blob(['\uFEFF' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+      const url  = URL.createObjectURL(blob);
+      const a    = Object.assign(document.createElement('a'), {
+        href    : url,
+        download: `${CONFIG.APP_TITLE.replace(/\s+/g, '_')}_${isoDate()}.csv`,
+      });
+      a.click();
+      URL.revokeObjectURL(url);
+      toast(`${App.filtered.length.toLocaleString(CONFIG.DATE_LOCALE)} baris diekspor ke CSV`, 't-success');
+    }
+
+
+    /* ==============================================================
+     * 🍞  TOAST NOTIFIKASI
+     * ============================================================== */
+
+    /**
+     * toast(msg, type, duration)
+     * Tampilkan notifikasi kecil di pojok kanan bawah.
+     * type: 't-success' | 't-error' | 't-info'
+     */
+    function toast(msg, type = 't-info', duration = 3800) {
+      const icons = { 't-success': '✅', 't-error': '❌', 't-info': 'ℹ️' };
+      const el    = document.createElement('div');
+      el.className  = `toast ${type}`;
+      el.innerHTML  = `
+        <span class="toast-ico" aria-hidden="true">${icons[type] || ''}</span>
+        <span class="toast-msg">${esc(msg)}</span>`;
+      dom('toast-wrap').appendChild(el);
+
+      setTimeout(() => {
+        el.classList.add('out');
+        el.addEventListener('animationend', () => el.remove(), { once: true });
+      }, duration);
+    }
+
+
+    /* ==============================================================
+     * 🛠️  UTILITAS
+     * ============================================================== */
+
+    /** dom(id) — shorthand untuk document.getElementById */
+    const dom = id => document.getElementById(id);
+
+    /**
+     * esc(str) — escape HTML untuk mencegah XSS.
+     * Semua nilai dari spreadsheet melewati fungsi ini sebelum ke innerHTML.
+     */
+    function esc(str) {
+      if (str == null) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    /**
+     * hlMatch(escapedText, query)
+     * Bungkus teks yang cocok dengan <mark> untuk highlight visual.
+     * Menerima teks yang sudah di-escape — aman dari XSS.
+     */
+    function hlMatch(escapedText, query) {
+      if (!query || !escapedText) return escapedText;
+      const safeQ = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      return escapedText.replace(
+        new RegExp(`(${safeQ})`, 'gi'),
+        '<mark>$1</mark>'
+      );
+    }
+
+    /** isoDate() — tanggal hari ini dalam format YYYY-MM-DD */
+    const isoDate = () => new Date().toISOString().slice(0, 10);
+
+
+    /* ==============================================================
+     * 🚀  INISIALISASI
+     * ============================================================== */
+
+    function init() {
+      /* 1. Terapkan teks dari config */
+      dom('app-title').textContent   = CONFIG.APP_TITLE;
+      dom('app-subtitle').textContent = CONFIG.APP_SUBTITLE;
+      document.title = CONFIG.APP_TITLE;
+
+      /* 2. Link ke spreadsheet asli */
+      if (CONFIG.SPREADSHEET_ID && CONFIG.SPREADSHEET_ID !== 'YOUR_SPREADSHEET_ID_HERE') {
+        dom('sheet-link').href =
+          `https://docs.google.com/spreadsheets/d/${CONFIG.SPREADSHEET_ID}/edit`;
+      }
+
+      /* 3. Tema: dari localStorage → preferensi sistem → default light */
+      let saved;
+      try { saved = localStorage.getItem('sv_theme'); } catch { /* incognito */ }
+      const sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const theme   = saved || (sysDark ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', theme);
+      dom('ico-theme').textContent = theme === 'dark' ? '☀️' : '🌙';
+
+      /* 4. Set nilai awal rows-per-page */
+      dom('sel-rpp').value = String(CONFIG.DEFAULT_RPP);
+      App.rpp = CONFIG.DEFAULT_RPP;
+
+      /* 5. Daftarkan event listeners */
+
+      /* Pencarian (debounced 250ms) */
+      dom('search-input').addEventListener('input', e => handleSearch(e.target.value));
+
+      /* Tombol hapus pencarian */
+      dom('btn-clear-search').addEventListener('click', clearSearch);
+
+      /* Dropdown rows per page */
+      dom('sel-rpp').addEventListener('change', e => {
+        App.rpp  = parseInt(e.target.value, 10);
+        App.page = 1;
+        renderBody();
+        renderPagination();
+      });
+
+      /* Tombol Refresh */
+      dom('btn-refresh').addEventListener('click', fetchData);
+
+      /* Tombol Ekspor */
+      dom('btn-export').addEventListener('click', exportCSV);
+
+      /* Tombol Dark Mode */
+      dom('btn-theme').addEventListener('click', toggleTheme);
+
+      /* Keyboard shortcuts global */
+      document.addEventListener('keydown', e => {
+        const tag = e.target.tagName;
+        const editing = ['INPUT', 'TEXTAREA', 'SELECT'].includes(tag);
+
+        /* Ctrl/Cmd + F → fokus ke search */
+        if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+          e.preventDefault();
+          dom('search-input').focus();
+          dom('search-input').select();
+          return;
+        }
+        /* R (saat tidak mengetik) → Refresh */
+        if (!editing && !e.ctrlKey && !e.metaKey && e.key === 'r') {
+          e.preventDefault();
+          fetchData();
+          return;
+        }
+        /* Escape → hapus pencarian jika aktif */
+        if (e.key === 'Escape' && App.query) {
+          clearSearch();
+        }
+      });
+
+      /* 6. Muat data pertama kali */
+      fetchData();
+    }
+
+    /* Jalankan init setelah DOM siap */
+    document.addEventListener('DOMContentLoaded', init);
+
+  </script>
+</body>
+</html>
